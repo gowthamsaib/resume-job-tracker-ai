@@ -1,17 +1,19 @@
 import re
+import spacy
 
-# Same known skills list — keep in sync with resume_parser
-KNOWN_SKILLS = [
-    "python", "sql", "tableau", "power bi", "excel", "snowflake",
-    "azure", "aws", "pandas", "numpy", "spark", "hadoop", "etl", "airflow",
-    "data engineering", "data analysis", "machine learning", "nlp", "scikit-learn",
-    "git", "jira", "confluence", "data visualization", "data wrangling"
-]
+nlp = spacy.load("en_core_web_sm")
 
 def extract_skills_from_jd(jd_text: str) -> list:
     jd_text = jd_text.lower()
-    found_skills = []
-    for skill in KNOWN_SKILLS:
-        if re.search(rf"\b{re.escape(skill)}\b", jd_text):
-            found_skills.append(skill)
-    return sorted(set(found_skills))
+    doc = nlp(jd_text)
+
+    # Extract noun chunks (phrases like "data engineering", "python development")
+    keywords = set(chunk.text.strip() for chunk in doc.noun_chunks if len(chunk.text.strip()) > 2)
+
+    # Optionally, clean up short/stop words and filter
+    filtered_skills = [
+        kw for kw in keywords
+        if len(kw) >= 3 and not kw.lower() in nlp.Defaults.stop_words
+    ]
+
+    return sorted(set(filtered_skills))
