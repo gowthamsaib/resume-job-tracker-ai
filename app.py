@@ -59,14 +59,36 @@ if menu == "Add Job":
         job_desc = st.text_area("Paste Job Description Here")
         applied_on = st.date_input("Date Applied", value=date.today())
 
-        submitted = st.form_submit_button("Save")
+        uploaded_resume = st.file_uploader("Upload Your Resume (PDF)", type="pdf")
+
+        submitted = st.form_submit_button("Save and Analyze")
+
         if submitted:
-            cursor.execute("""
-                INSERT INTO jobs (company, role, status, job_desc, applied_on)
-                VALUES (?, ?, ?, ?, ?)
-            """, (company, role, status, job_desc, applied_on))
-            conn.commit()
-            st.success("✅ Job application saved!")
+            if uploaded_resume is None or job_desc.strip() == "":
+                st.error("❗ Please upload your resume and paste a job description.")
+            else:
+                # Save job to DB
+                cursor.execute("""
+                    INSERT INTO jobs (company, role, status, job_desc, applied_on)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (company, role, status, job_desc, applied_on))
+                conn.commit()
+                st.success("✅ Job application saved!")
+
+                # Analyze resume vs JD
+                with open("temp_resume.pdf", "wb") as f:
+                    f.write(uploaded_resume.read())
+
+                resume_skills = parse_resume("temp_resume.pdf")
+                jd_skills = extract_skills_from_jd(job_desc)
+                result = compare_skills(resume_skills, jd_skills)
+
+                # Show results
+                st.markdown("---")
+                st.markdown("### 🧠 AI Skill Match Insights")
+                st.write(f"📊 **Match Percentage:** `{result['match_percent']}%`")
+                st.success(f"✅ Matched Skills: {', '.join(result['matched_skills'])}" if result['matched_skills'] else "No matches found.")
+                st.warning(f"❌ Missing Skills: {', '.join(result['missing_skills'])}" if result['missing_skills'] else "No missing skills!")
 
 # --- View Applications ---
 elif menu == "View Applications":
