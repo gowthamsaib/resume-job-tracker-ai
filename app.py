@@ -13,15 +13,22 @@ def get_connection():
 conn = get_connection()
 cursor = conn.cursor()
 
-# --- UI Layout ---
+# --- UI Setup ---
 st.set_page_config(page_title="Job Tracker", layout="centered")
-st.title("📌 Resume / Job Tracker with AI Insights")
 
-menu = st.sidebar.radio("Go to", ["Add Job", "View Applications"])
+# --- Page Banner ---
+st.markdown("""
+    <div style='text-align: center; padding: 1rem 0; background-color: #f0f4f8; border-radius: 10px;'>
+        <h1 style='color: #333;'>📌 Resume & Job Tracker with AI Insights</h1>
+        <p style='color: #666; font-size: 16px;'>Track your job applications and let AI match your resume with job descriptions.</p>
+    </div>
+""", unsafe_allow_html=True)
+
+menu = st.sidebar.radio("🔍 Navigate", ["Add Job", "View Applications"])
 
 # --- Add Job Form ---
 if menu == "Add Job":
-    st.subheader("📝 Add New Job Application")
+    st.markdown("### 📝 <span style='color:#3366cc'>Add New Job Application</span>", unsafe_allow_html=True)
 
     with st.form("job_form"):
         company = st.text_input("Company Name")
@@ -45,40 +52,41 @@ if menu == "Add Job":
                 conn.commit()
                 st.success("✅ Job application saved!")
 
-                # Handle resume: uploaded or fallback
+                # Resume file (uploaded or fallback)
                 if uploaded_resume:
                     with open("temp_resume.pdf", "wb") as f:
                         f.write(uploaded_resume.read())
                     resume_path = "temp_resume.pdf"
                 else:
-                    resume_path = "default_resume.pdf"  # fallback file
+                    resume_path = "default_resume.pdf"
 
                 resume_skills = parse_resume(resume_path)
                 jd_skills = extract_skills_from_jd(job_desc)
                 result = compare_skills(resume_skills, jd_skills)
 
-                # Show results with styling
                 st.markdown("---")
-                st.markdown("## 🧠 AI Skill Match Insights")
+                st.markdown("### 🧠 <span style='color:#3366cc'>AI Skill Match Insights</span>", unsafe_allow_html=True)
 
-                st.markdown(f"**🔎 Match Score:** `{result['match_percent']}%`")
+                st.markdown(f"""
+                    <div style='text-align:center; font-weight:bold; font-size:18px; margin-bottom:10px;'>
+                        🔎 Match Score: {result['match_percent']}%
+                    </div>
+                """, unsafe_allow_html=True)
                 st.progress(min(result['match_percent'] / 100, 1.0))
 
                 if result["matched_skills"]:
-                    st.markdown("✅ **Matched Skills:**")
-                    st.markdown(", ".join([f"`{s}`" for s in result["matched_skills"]]))
+                    st.success(f"✅ Matched Skills: {', '.join(result['matched_skills'])}")
                 else:
                     st.info("No matched skills found.")
 
                 if result["missing_skills"]:
-                    st.markdown("❌ **Missing Skills:**")
-                    st.markdown(", ".join([f"`{s}`" for s in result["missing_skills"]]))
+                    st.warning(f"❌ Missing Skills: {', '.join(result['missing_skills'])}")
                 else:
                     st.success("Perfect match! No missing skills.")
 
 # --- View Applications ---
 elif menu == "View Applications":
-    st.subheader("📋 All Saved Applications")
+    st.markdown("### 📋 <span style='color:#3366cc'>All Saved Applications</span>", unsafe_allow_html=True)
 
     df = pd.read_sql_query("SELECT * FROM jobs ORDER BY applied_on DESC", conn)
     st.dataframe(df)
@@ -87,17 +95,21 @@ elif menu == "View Applications":
         job_ids = df["id"].tolist()
         selected_id = st.selectbox("Select Job ID", job_ids)
 
-        # Show selected job details
         selected_job = df[df["id"] == selected_id].iloc[0]
-        st.markdown("### 🗂️ Job Details")
+        st.markdown("### 🗂️ <span style='color:#3366cc'>Job Details</span>", unsafe_allow_html=True)
+
         st.write(f"**Company:** {selected_job['company']}")
         st.write(f"**Role:** {selected_job['role']}")
         st.write(f"**Status:** {selected_job['status']}")
         st.write(f"**Applied On:** {selected_job['applied_on']}")
-        st.markdown("**Job Description:**")
-        st.markdown(f"```text\n{selected_job['job_desc']}\n```")
 
-        # Edit/Delete Buttons
+        st.markdown("**Job Description:**")
+        st.markdown(f"""
+            <div style='background:#f9f9f9;padding:1em;border-radius:8px;max-height:300px;overflow-y:auto;'>
+                {selected_job['job_desc']}
+            </div>
+        """, unsafe_allow_html=True)
+
         col1, col2 = st.columns(2)
         with col1:
             show_edit_form = st.button("✏️ Edit Job")
@@ -106,10 +118,10 @@ elif menu == "View Applications":
                 cursor.execute("DELETE FROM jobs WHERE id=?", (selected_id,))
                 conn.commit()
                 st.warning("🗑️ Job deleted!")
-                st.experimental_rerun()
+                
 
         if show_edit_form:
-            st.markdown("### ✏️ Update Job Details")
+            st.markdown("### ✏️ <span style='color:#3366cc'>Update Job Details</span>", unsafe_allow_html=True)
             with st.form("edit_form"):
                 new_company = st.text_input("Company Name", value=selected_job["company"])
                 new_role = st.text_input("Job Role", value=selected_job["role"])
@@ -127,33 +139,4 @@ elif menu == "View Applications":
                     """, (new_company, new_role, new_status, new_job_desc, new_applied_on, selected_id))
                     conn.commit()
                     st.success("✅ Job updated!")
-                    st.experimental_rerun()
-
-
-
-# --- Optional Test Buttons ---
-if st.sidebar.button("Test Resume Parser"):
-    resume_skills = parse_resume("your_resume.pdf")
-    st.write("🧠 Extracted Skills from Resume:", resume_skills)
-
-if st.sidebar.button("Test JD Parser"):
-    sample_jd = """
-    We are looking for a Data Engineer with experience in Python, SQL, Snowflake, and Airflow.
-    Familiarity with Azure and Power BI is a plus. Strong communication skills required.
-    """
-    jd_skills = extract_skills_from_jd(sample_jd)
-    st.write("🧾 Extracted Skills from Job Description:", jd_skills)
-
-if st.sidebar.button("Test Skill Match"):
-    resume_skills = parse_resume("your_resume.pdf")
-    jd_text = """
-    We are hiring a Data Analyst with experience in SQL, Python, Tableau, and Power BI.
-    Knowledge of Excel and Azure is an advantage.
-    """
-    jd_skills = extract_skills_from_jd(jd_text)
-    result = compare_skills(resume_skills, jd_skills)
-
-    st.markdown("## 🧠 Skill Match Results (Test)")
-    st.write(f"**Match %:** `{result['match_percent']}%`")
-    st.success(f"✅ Matched Skills: {', '.join(result['matched_skills'])}" if result['matched_skills'] else "No matches found.")
-    st.warning(f"❌ Missing Skills: {', '.join(result['missing_skills'])}" if result['missing_skills'] else "No missing skills!")
+                    
